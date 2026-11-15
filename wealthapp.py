@@ -1,7 +1,30 @@
+import sqlite3
+import pandas as pd
 import streamlit as st
+import yfinance as yf
 
-# Page Setup & Brandings
+# =========================================================
+# PAGE SETUP & BRANDING
+# =========================================================
 st.set_page_config(page_title="WealthMap", page_icon="💰", layout="wide")
+
+# =========================================================
+# BACKEND DATABASE SETUP (SQLite)
+# =========================================================
+conn = sqlite3.connect("wealthmap_database.db", check_same_thread=False)
+cursor = conn.cursor()
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        income REAL,
+        expenses REAL,
+        cash REAL,
+        bank REAL,
+        investments REAL,
+        debts REAL
+    )
+""")
+conn.commit()
 
 st.title("WealthMap: Your Personal Financial Navigator")
 st.subheader("Know your money. Control your future.")
@@ -20,10 +43,28 @@ bank_balance = st.sidebar.number_input("Bank Balance (₹)", min_value=0, value=
 investments = st.sidebar.number_input("Total Investments (₹)", min_value=0, value=75000, step=5000)
 loans_debts = st.sidebar.number_input("Total Loans / Debts (₹)", min_value=0, value=35000, step=5000)
 
+# Save data into SQLite Backend when button is clicked
+if st.sidebar.button("💾 Save Profile to Backend"):
+    cursor.execute("DELETE FROM user_profiles")
+    cursor.execute(
+        """
+        INSERT INTO user_profiles (income, expenses, cash, bank, investments, debts)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (monthly_income, monthly_expenses, cash_in_hand, bank_balance, investments, loans_debts),
+    )
+    conn.commit()
+    st.sidebar.success("Profile successfully saved to backend database!")
+
 st.sidebar.markdown("---")
 st.sidebar.header("⚠️ Impulse / Overspending Log")
-overspent_amount = st.sidebar.number_input("Overspent This Month (₹)", min_value=0, value=0, step=500,
-                                           help="Unexpected expenses or impulsive shopping.")
+overspent_amount = st.sidebar.number_input(
+    "Overspent This Month (₹)",
+    min_value=0,
+    value=0,
+    step=500,
+    help="Unexpected expenses or impulsive shopping."
+)
 
 # =========================================================
 # CORE CALCULATIONS ENGINE
@@ -85,16 +126,19 @@ else:
     health_score += 0  # 0 points for heavy overspending
 
 # =========================================================
-# 7-MODULE MULTI-TAB NAVIGATION
+# 10-MODULE MULTI-TAB NAVIGATION
 # =========================================================
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
     "🏠 Overview",
     "💎 Net Worth & Liquidity",
     "🛡️ Emergency Coverage",
     "📊 Savings & Budget",
     "⚠️ Overspending Impact",
     "🏆 Health Scorecard",
-    "💡 Expert Roadmap"
+    "💡 Expert Roadmap",
+    "🤖 AI Financial Advisor",
+    "📈 Stock Portfolio",
+    "💾 Saved Records"
 ])
 
 # ---------------------------------------------------------
@@ -103,7 +147,6 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 with tab1:
     st.header("Welcome to WealthMap Dashboard")
     st.success("### “Do not save what is left after spending, but spend what is left after saving.” – *Warren Buffett*")
-
     st.markdown("Your financial command center. All metrics are calculated live from your sidebar inputs.")
 
     c1, c2, c3, c4 = st.columns(4)
@@ -143,8 +186,7 @@ with tab3:
     st.metric("Emergency Survival Duration", f"{emergency_months:.1f} Months")
 
     if emergency_months < 3:
-        st.error(
-            "🚨 **High Risk:** Your liquid cash covers less than 3 months of expenses. Focus on building an emergency reserve.")
+        st.error("🚨 **High Risk:** Your liquid cash covers less than 3 months of expenses. Focus on building an emergency reserve.")
     elif emergency_months < 6:
         st.warning("⚠️ **Moderate Safety:** You have a fair buffer, but aim for a full 6-month safety net.")
     else:
@@ -181,14 +223,11 @@ with tab5:
 
     st.markdown("---")
     if overspent_amount == 0:
-        st.success(
-            "🎉 **Clean Discipline!** You have 0 overspending logged this month. You earned full bonus points on your Health Scorecard!")
+        st.success("🎉 **Clean Discipline!** You have 0 overspending logged this month. You earned full bonus points on your Health Scorecard!")
     elif net_savings < 0:
-        st.error(
-            f"🚨 **Deficit Alert:** You overspent by ₹{overspent_amount:,.2f}, putting your monthly budget in the RED. You are consuming your existing savings!")
+        st.error(f"🚨 **Deficit Alert:** You overspent by ₹{overspent_amount:,.2f}, putting your monthly budget in the RED. You are consuming your existing savings!")
     else:
-        st.warning(
-            f"⚠️ **Savings Drained:** Overspending reduced your total monthly savings to ₹{net_savings:,.2f}. Try to minimize non-essential purchases.")
+        st.warning(f"⚠️ **Savings Drained:** Overspending reduced your total monthly savings to ₹{net_savings:,.2f}. Try to minimize non-essential purchases.")
 
 # ---------------------------------------------------------
 # TAB 6: HEALTH SCORECARD & GAMIFICATION
@@ -205,8 +244,7 @@ with tab6:
     elif health_score >= 60:
         st.info("🚀 **Tier: Financial Explorer** — Solid base, but cut down impulse spending or clear debt.")
     elif health_score >= 40:
-        st.warning(
-            "⚠️ **Tier: Money Learner** — Caution advised. Overspending or low liquidity is hurting your progress.")
+        st.warning("⚠️ **Tier: Money Learner** — Caution advised. Overspending or low liquidity is hurting your progress.")
     else:
         st.error("🚨 **Tier: Risk Zone** — Vulnerable financial state. Immediate budget control required.")
 
@@ -217,8 +255,7 @@ with tab7:
     st.header("💡 Expert Financial Roadmap")
 
     if overspent_amount > 0:
-        st.error(
-            f"• **Overspending Control:** You overspent ₹{overspent_amount:,.2f} this month. Audit discretionary expenses to protect your savings rate.")
+        st.error(f"• **Overspending Control:** You overspent ₹{overspent_amount:,.2f} this month. Audit discretionary expenses to protect your savings rate.")
     else:
         st.success("• **Overspending Control:** Excellent impulse control!")
 
@@ -231,3 +268,62 @@ with tab7:
         st.warning("• **Debt Strategy:** Pay off active liabilities to strengthen your Net Worth.")
     else:
         st.success("• **Debt Strategy:** Completely debt-free!")
+
+# ---------------------------------------------------------
+# TAB 8: AI FINANCIAL ADVISOR
+# ---------------------------------------------------------
+with tab8:
+    st.header("🤖 AI Financial Coach & Insights")
+    st.markdown("Get an instant diagnostic review based on your current financial inputs.")
+
+    if st.button("Generate AI Financial Health Review"):
+        if savings_rate < 20:
+            st.warning("⚠️ **Low Savings Warning:** Your savings rate is below the recommended 20%.")
+        else:
+            st.success("✅ **Great Savings Discipline:** Meeting or exceeding the 20% target!")
+
+        if emergency_months < 6:
+            st.info(f"🛡️ **Emergency Buffer:** Covers {emergency_months:.1f} months. Aim for 6 months.")
+        else:
+            st.success("🛡️ **Solid Safety Net:** Over 6 months of reserves secured.")
+
+        if loans_debts > investments:
+            st.warning("💡 **Debt Priority:** Your active loans exceed your investments. Focus on reducing debt first.")
+        else:
+            st.success("🚀 **Wealth Growth:** Your investments outpace your debts—great asset allocation!")
+
+# ---------------------------------------------------------
+# TAB 9: STOCK & INVESTMENT PORTFOLIO TRACKER
+# ---------------------------------------------------------
+with tab9:
+    st.header("📈 Live Stock & Market Portfolio Tracker")
+    ticker_symbol = st.text_input(
+        "Enter Stock Ticker (e.g., RELIANCE.NS, TCS.NS, AAPL)",
+        value="RELIANCE.NS"
+    )
+    if ticker_symbol:
+        try:
+            stock_data = yf.Ticker(ticker_symbol)
+            hist = stock_data.history(period="1mo")
+            if not hist.empty:
+                current_price = hist["Close"].iloc[-1]
+                st.metric(
+                    label=f"Current Price ({ticker_symbol})",
+                    value=f"₹{current_price:,.2f}",
+                )
+                st.line_chart(hist["Close"])
+            else:
+                st.error("Could not fetch ticker data. Check symbol formatting.")
+        except Exception as e:
+            st.error(f"Error fetching data: {e}")
+
+# ---------------------------------------------------------
+# TAB 10: BACKEND DATA EXPLORER
+# ---------------------------------------------------------
+with tab10:
+    st.header("💾 Persistent SQLite Database Records")
+    saved_df = pd.read_sql("SELECT * FROM user_profiles", conn)
+    if not saved_df.empty:
+        st.dataframe(saved_df)
+    else:
+        st.warning("No records saved yet. Click '💾 Save Profile to Backend' in the sidebar!")
